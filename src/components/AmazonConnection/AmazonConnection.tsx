@@ -25,10 +25,12 @@ export default function AmazonConnection() {
 
   const handleExportProducts = (productsToExport: Product[]) => {
     const worksheet = XLSX.utils.json_to_sheet(productsToExport.map(product => ({
-      EAN: product.ean,
+      SKU: product.sku,
       Name: product.name,
       Price: product.price,
-      Quantity: product.quantity,
+      Stock: product.stock,
+      Category: product.category,
+      Status: product.status,
       'Last Updated': new Date(product.lastUpdated).toLocaleDateString(),
     })));
 
