@@ -3,7 +3,7 @@ config:
     version: "18"
     framework: "NextJs"
     buildCommand: "npm install && npm run build"
-    startCommand: "npm start"
+    startCommand: "node server.js"
     installCommand: "npm install"
     port: "3000"
 
@@ -12,3 +12,7 @@ scripts:
         rm -f Dockerfile || true
         git reset --hard
         git pull origin feat/amazon-ean-import
+
+environment_variables:
+    NODE_ENV: "production"
+    NEXT_PUBLIC_BASE_URL: "https://machin-u23037.vm.elestio.app"
