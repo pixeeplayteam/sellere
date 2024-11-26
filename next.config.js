@@ -1,13 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  basePath: '',
-  trailingSlash: true,
   poweredByHeader: false,
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    unoptimized: true,
     domains: ['picsum.photos', 'ssl-images-amazon.com', 'media-amazon.com'],
     remotePatterns: [
       {
