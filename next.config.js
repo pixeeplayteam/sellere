@@ -3,8 +3,12 @@ const nextConfig = {
   output: 'standalone',
   basePath: '',
   trailingSlash: true,
+  poweredByHeader: false,
+  reactStrictMode: true,
+  swcMinify: true,
   images: {
     unoptimized: true,
+    domains: ['picsum.photos', 'ssl-images-amazon.com', 'media-amazon.com'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -50,11 +54,18 @@ const nextConfig = {
           {
             key: 'X-XSS-Protection',
             value: '1; mode=block'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin'
           }
         ]
       }
     ];
   },
+  experimental: {
+    serverActions: true,
+  }
 }
 
 module.exports = nextConfig
