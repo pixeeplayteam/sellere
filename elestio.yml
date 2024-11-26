@@ -1,0 +1,14 @@
+config:
+    runTime: "NodeJs"
+    version: "18"
+    framework: "NextJs"
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    installCommand: "npm install"
+    port: "3000"
+
+scripts:
+    postInstall: |
+        rm -f Dockerfile || true
+        git reset --hard
+        git pull origin feat/amazon-ean-import
