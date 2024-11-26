@@ -5,7 +5,7 @@ import EANImport from './EANImport';
 import ProductTable from './ProductTable';
 import { Product } from '@/types';
 import { enrichProductWithAmazonData } from '@/utils/amazonApi';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export default function AmazonConnection() {
   const [showSettings, setShowSettings] = useState(true);
@@ -23,25 +23,42 @@ export default function AmazonConnection() {
     );
   };
 
-  const handleExportProducts = (productsToExport: Product[]) => {
-    const worksheet = XLSX.utils.json_to_sheet(productsToExport.map(product => ({
-      SKU: product.sku,
-      Name: product.name,
-      Price: product.price,
-      Stock: product.stock,
-      Category: product.category,
-      Status: product.status,
-      'Last Updated': new Date(product.lastUpdated).toLocaleDateString(),
-    })));
+  const handleExportProducts = async (productsToExport: Product[]) => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Products');
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
-    
-    // Generate filename with current date
+    // Define columns
+    worksheet.columns = [
+      { header: 'SKU', key: 'sku', width: 20 },
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Price', key: 'price', width: 10 },
+      { header: 'Stock', key: 'stock', width: 10 },
+      { header: 'Category', key: 'category', width: 20 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Last Updated', key: 'lastUpdated', width: 20 }
+    ];
+
+    // Add rows
+    productsToExport.forEach(product => {
+      worksheet.addRow({
+        sku: product.sku,
+        name: product.name,
+        price: product.price,
+        stock: product.stock,
+        category: product.category,
+        status: product.status,
+        lastUpdated: new Date(product.lastUpdated).toLocaleDateString()
+      });
+    });
+
+    // Style the header row
+    worksheet.getRow(1).font = { bold: true };
+
     const date = new Date().toISOString().split('T')[0];
     const filename = `amazon-products-${date}.xlsx`;
-    
-    XLSX.writeFile(workbook, filename);
+
+    // Generate and save the file
+    await workbook.xlsx.writeFile(filename);
   };
 
   const handleUpdateProduct = async (product: Product) => {
