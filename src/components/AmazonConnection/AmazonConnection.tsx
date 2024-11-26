@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Loader2, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import AmazonSettings from './AmazonSettings';
 import EANImport from './EANImport';
+import ProductTable from './ProductTable';
 import { Product } from '@/types';
-import { fetchAmazonInventory } from '@/utils/amazonApi';
-import { testAmazonConnection } from '@/utils/amazonApi';
-import type { AmazonCredentials } from '@/types';
+import { enrichProductWithAmazonData } from '@/utils/amazonApi';
+import * as XLSX from 'xlsx';
 
-interface AmazonConnectionProps {
-  onProductsImported: (products: Product[]) => void;
-}
-
-export default function AmazonConnection({ onProductsImported }: AmazonConnectionProps) {
+export default function AmazonConnection() {
   const [showSettings, setShowSettings] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,41 +17,43 @@ export default function AmazonConnection({ onProductsImported }: AmazonConnectio
     setProducts((prevProducts) => [...prevProducts, ...newProducts]);
   };
 
-  const handleSync = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const products = await fetchAmazonInventory();
-      onProductsImported(products);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sync with Amazon');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleDeleteProducts = async (productIds: string[]) => {
+    setProducts((prevProducts) => 
+      prevProducts.filter(product => !productIds.includes(product.id))
+    );
   };
 
-  const handleSaveCredentials = (credentials: AmazonCredentials) => {
-    try {
-      localStorage.setItem('amazonCredentials', JSON.stringify(credentials));
-      Object.entries(credentials).forEach(([key, value]) => {
-        if (key.startsWith('NEXT_PUBLIC_')) {
-          (window as any).process.env[key] = value;
-        } else {
-          (window as any).process.env[`AMAZON_${key.toUpperCase()}`] = value;
-        }
-      });
-      setError(null);
-    } catch (err) {
-      setError('Failed to save credentials');
-    }
+  const handleExportProducts = (productsToExport: Product[]) => {
+    const worksheet = XLSX.utils.json_to_sheet(productsToExport.map(product => ({
+      EAN: product.ean,
+      Name: product.name,
+      Price: product.price,
+      Quantity: product.quantity,
+      'Last Updated': new Date(product.lastUpdated).toLocaleDateString(),
+    })));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+    
+    // Generate filename with current date
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `amazon-products-${date}.xlsx`;
+    
+    XLSX.writeFile(workbook, filename);
   };
 
-  const handleTestConnection = async (credentials: AmazonCredentials): Promise<boolean> => {
+  const handleUpdateProduct = async (product: Product) => {
     try {
-      return await testAmazonConnection(credentials);
+      const updatedProduct = await enrichProductWithAmazonData(product.ean);
+      if (updatedProduct) {
+        setProducts(prevProducts => 
+          prevProducts.map(p => 
+            p.id === product.id ? { ...updatedProduct, id: product.id } : p
+          )
+        );
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection test failed');
-      return false;
+      setError('Failed to update product from Amazon');
     }
   };
 
@@ -81,10 +79,7 @@ export default function AmazonConnection({ onProductsImported }: AmazonConnectio
 
       {showSettings && (
         <div className="space-y-4">
-          <AmazonSettings
-            onSave={handleSaveCredentials}
-            onTest={handleTestConnection}
-          />
+          <AmazonSettings />
           
           <div className="border-t pt-4">
             <h3 className="text-md font-medium mb-3">Import Products</h3>
@@ -93,61 +88,21 @@ export default function AmazonConnection({ onProductsImported }: AmazonConnectio
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 items-center justify-between border-b border-gray-200 pb-4">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleSync}
-            disabled={isLoading}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="-ml-1 mr-2 h-4 w-4" />
-                Sync Amazon Products
-              </>
-            )}
-          </button>
-        </div>
-        
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-            {error}
-          </div>
-        )}
-      </div>
-
-      {products.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-md font-medium mb-3">Imported Products</h3>
-          <div className="border rounded-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EAN</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.ean}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.price}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+          {error}
         </div>
       )}
+
+      <div className="mt-6">
+        <h3 className="text-md font-medium mb-3">Product Management</h3>
+        <ProductTable
+          products={products}
+          onDeleteProducts={handleDeleteProducts}
+          onExportProducts={handleExportProducts}
+          onUpdateProduct={handleUpdateProduct}
+        />
+      </div>
     </div>
   );
 }
